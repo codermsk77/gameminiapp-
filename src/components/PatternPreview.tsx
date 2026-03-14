@@ -2,6 +2,7 @@ import type { Pattern } from '../data/patterns';
 
 const NODE_R = 4;
 const STROKE = 1.2;
+const snapCoord = (value: number) => Math.round(value) + 0.5;
 
 interface PatternPreviewProps {
   pattern: Pattern;
@@ -13,8 +14,9 @@ export function PatternPreview({ pattern, size = 180, className = '' }: PatternP
   const padding = size * 0.15;
 
   const toSvg = (nx: number, ny: number) => {
-    const x = padding + nx * (size - 2 * padding);
-    const y = padding + (1 - ny) * (size - 2 * padding);
+    // Привязка к пиксельной сетке делает вертикали и горизонтали визуально ровнее.
+    const x = snapCoord(padding + nx * (size - 2 * padding));
+    const y = snapCoord(padding + (1 - ny) * (size - 2 * padding));
     return [x, y] as const;
   };
 

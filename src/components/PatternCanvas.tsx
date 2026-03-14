@@ -5,6 +5,7 @@ import { hapticLight, hapticSelection } from '../utils/haptic';
 const NODE_R = 6;
 const HIT_R = 20;
 const STROKE = 1.5;
+const snapCoord = (value: number) => Math.round(value) + 0.5;
 
 function getSvgCoords(
   e: React.MouseEvent | React.TouchEvent,
@@ -25,8 +26,8 @@ function findNearestNode(
   let minD = HIT_R;
   let idx: number | null = null;
   for (let i = 0; i < nodes.length; i++) {
-    const nx = padding + nodes[i][0] * (size - 2 * padding);
-    const ny = padding + (1 - nodes[i][1]) * (size - 2 * padding);
+    const nx = snapCoord(padding + nodes[i][0] * (size - 2 * padding));
+    const ny = snapCoord(padding + (1 - nodes[i][1]) * (size - 2 * padding));
     const d = Math.hypot(x - nx, y - ny);
     if (d < minD) {
       minD = d;
@@ -68,8 +69,9 @@ export const PatternCanvas = forwardRef<PatternCanvasRef, PatternCanvasProps>(
 
   const toSvg = useCallback(
     (nx: number, ny: number) => {
-      const x = padding + nx * (size - 2 * padding);
-      const y = padding + (1 - ny) * (size - 2 * padding);
+      // Привязка к пиксельной сетке убирает визуальный "дрейф" вертикалей и горизонталей.
+      const x = snapCoord(padding + nx * (size - 2 * padding));
+      const y = snapCoord(padding + (1 - ny) * (size - 2 * padding));
       return [x, y] as const;
     },
     [size, padding]
