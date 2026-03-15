@@ -4,12 +4,12 @@
   --color-surface: #ffffff;
   --color-text: #1a1a1a;
   --color-text-muted: #6b6b6b;
-  --color-accent: #2d5a4a;
-  --color-accent-hover: #3d7a65;
-  --color-stroke: #c4beb6;
-  --color-node: #a8a29e;
+  --color-accent: #6f6a65;
+  --color-accent-hover: #58534f;
+  --color-stroke: #c6c0b9;
+  --color-node: #b0aaa4;
   --color-node-start: #3d3d3d;
-  --color-progress: #2d5a4a;
+  --color-progress: #7b746d;
   --color-progress-bg: #e8e4df;
   --radius-sm: 8px;
   --radius-md: 12px;

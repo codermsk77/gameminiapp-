@@ -1,4 +1,5 @@
 import type { Pattern } from '../data/patterns';
+import { createPatternProjector } from '../utils/patternLayout';
 
 const NODE_R = 4;
 const STROKE = 1.2;
@@ -11,14 +12,8 @@ interface PatternPreviewProps {
 }
 
 export function PatternPreview({ pattern, size = 180, className = '' }: PatternPreviewProps) {
-  const padding = size * 0.15;
-
-  const toSvg = (nx: number, ny: number) => {
-    // Привязка к пиксельной сетке делает вертикали и горизонтали визуально ровнее.
-    const x = snapCoord(padding + nx * (size - 2 * padding));
-    const y = snapCoord(padding + (1 - ny) * (size - 2 * padding));
-    return [x, y] as const;
-  };
+  const padding = size * 0.08;
+  const toSvg = createPatternProjector(pattern.nodes, size, padding, snapCoord);
 
   return (
     <svg
@@ -26,6 +21,7 @@ export function PatternPreview({ pattern, size = 180, className = '' }: PatternP
       height={size}
       viewBox={`0 0 ${size} ${size}`}
       className={className}
+      style={{ maxWidth: '100%', height: 'auto', display: 'block' }}
     >
       <g stroke="var(--color-stroke)" strokeWidth={STROKE} fill="none">
         {pattern.edges.map(([from, to], i) => {
@@ -34,8 +30,9 @@ export function PatternPreview({ pattern, size = 180, className = '' }: PatternP
           const dx = x2 - x1;
           const dy = y2 - y1;
           const len = Math.hypot(dx, dy);
-          const ax = (dx / len) * (len - 8);
-          const ay = (dy / len) * (len - 8);
+          const bodyLen = Math.max(len - 8, 0);
+          const ax = (dx / len) * bodyLen;
+          const ay = (dy / len) * bodyLen;
           return (
             <g key={i}>
               <line x1={x1} y1={y1} x2={x1 + ax} y2={y1 + ay} />

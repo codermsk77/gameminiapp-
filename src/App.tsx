@@ -100,7 +100,7 @@ export default function App() {
 
       {screen === 'start' && (
         <section className="screen start-screen">
-          <PatternPreview pattern={PATTERNS[0]} className="pattern-preview" />
+          <PatternPreview pattern={PATTERNS[0]} size={220} className="pattern-preview" />
           <h1>Натренированный отдых</h1>
           <p className="subtitle">«Паттерны»</p>
           <div className="mode-selector">
@@ -143,7 +143,7 @@ export default function App() {
               ref={canvasRef}
               key={currentIndex}
               pattern={currentPattern}
-              size={300}
+              size={340}
             />
           </div>
           <div className="game-actions">

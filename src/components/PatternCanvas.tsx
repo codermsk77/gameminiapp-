@@ -1,11 +1,19 @@
-import { useRef, useState, useCallback, forwardRef, useImperativeHandle } from 'react';
+import { useRef, useState, useCallback, useMemo, forwardRef, useImperativeHandle } from 'react';
 import type { Pattern } from '../data/patterns';
 import { hapticLight, hapticSelection } from '../utils/haptic';
+import { createPatternProjector } from '../utils/patternLayout';
 
 const NODE_R = 6;
 const HIT_R = 20;
 const STROKE = 1.5;
 const snapCoord = (value: number) => Math.round(value) + 0.5;
+
+type UserSegment = [number, number];
+type ActiveSegment = {
+  startIndex: number;
+  endIndex: number | null;
+  pointer: [number, number];
+};
 
 function getSvgCoords(
   e: React.MouseEvent | React.TouchEvent,
@@ -20,14 +28,12 @@ function findNearestNode(
   x: number,
   y: number,
   nodes: [number, number][],
-  size: number,
-  padding: number
+  toSvg: (nx: number, ny: number) => readonly [number, number]
 ): number | null {
   let minD = HIT_R;
   let idx: number | null = null;
   for (let i = 0; i < nodes.length; i++) {
-    const nx = snapCoord(padding + nodes[i][0] * (size - 2 * padding));
-    const ny = snapCoord(padding + (1 - nodes[i][1]) * (size - 2 * padding));
+    const [nx, ny] = toSvg(nodes[i][0], nodes[i][1]);
     const d = Math.hypot(x - nx, y - ny);
     if (d < minD) {
       minD = d;
@@ -51,30 +57,24 @@ interface PatternCanvasProps {
 export const PatternCanvas = forwardRef<PatternCanvasRef, PatternCanvasProps>(
   function PatternCanvas({ pattern, size = 280, className = '' }, ref) {
   const svgRef = useRef<SVGSVGElement>(null);
-  const [userLines, setUserLines] = useState<[number, number][][]>([]);
-  const [currentLine, setCurrentLine] = useState<[number, number][] | null>(null);
-  const lastNodeRef = useRef<number | null>(null);
+  const [userSegments, setUserSegments] = useState<UserSegment[]>([]);
+  const [activeSegment, setActiveSegment] = useState<ActiveSegment | null>(null);
 
   useImperativeHandle(ref, () => ({
     undo: () => {
-      if (userLines.length === 0) return false;
-      setUserLines((prev) => prev.slice(0, -1));
+      if (userSegments.length === 0) return false;
+      setUserSegments((prev) => prev.slice(0, -1));
       hapticLight();
       return true;
     },
-    hasDrawn: () => userLines.length > 0,
-  }), [userLines.length]);
+    hasDrawn: () => userSegments.length > 0,
+  }), [userSegments.length]);
 
-  const padding = size * 0.12;
+  const padding = size * 0.08;
 
-  const toSvg = useCallback(
-    (nx: number, ny: number) => {
-      // Привязка к пиксельной сетке убирает визуальный "дрейф" вертикалей и горизонталей.
-      const x = snapCoord(padding + nx * (size - 2 * padding));
-      const y = snapCoord(padding + (1 - ny) * (size - 2 * padding));
-      return [x, y] as const;
-    },
-    [size, padding]
+  const toSvg = useMemo(
+    () => createPatternProjector(pattern.nodes, size, padding, snapCoord),
+    [pattern.nodes, size, padding]
   );
 
   const handleStart = useCallback(
@@ -82,36 +82,47 @@ export const PatternCanvas = forwardRef<PatternCanvasRef, PatternCanvasProps>(
       const rect = svgRef.current?.getBoundingClientRect();
       if (!rect) return;
       const [x, y] = getSvgCoords(e, rect);
-      const nodeIdx = findNearestNode(x, y, pattern.nodes, size, padding);
+      const nodeIdx = findNearestNode(x, y, pattern.nodes, toSvg);
       if (nodeIdx !== null) {
         hapticSelection();
-        const [sx, sy] = toSvg(pattern.nodes[nodeIdx][0], pattern.nodes[nodeIdx][1]);
-        lastNodeRef.current = nodeIdx;
-        setCurrentLine([[sx, sy]]);
+        setActiveSegment({
+          startIndex: nodeIdx,
+          endIndex: null,
+          pointer: [x, y],
+        });
       }
     },
-    [pattern, size, padding, toSvg]
+    [pattern, toSvg]
   );
 
   const handleMove = useCallback(
     (e: React.MouseEvent | React.TouchEvent) => {
-      if (!currentLine?.length) return;
+      if (!activeSegment) return;
       const rect = svgRef.current?.getBoundingClientRect();
       if (!rect) return;
       const [x, y] = getSvgCoords(e, rect);
-      setCurrentLine((prev) => (prev ? [...prev, [x, y]] : null));
+      const nodeIdx = findNearestNode(x, y, pattern.nodes, toSvg);
+      setActiveSegment((prev) => (
+        prev
+          ? {
+              ...prev,
+              pointer: [x, y],
+              endIndex: nodeIdx !== null && nodeIdx !== prev.startIndex ? nodeIdx : null,
+            }
+          : null
+      ));
     },
-    [currentLine]
+    [activeSegment, pattern.nodes, toSvg]
   );
 
   const handleEnd = useCallback(() => {
-    if (currentLine && currentLine.length > 1) {
+    if (activeSegment && activeSegment.endIndex !== null) {
+      const { startIndex, endIndex } = activeSegment;
       hapticLight();
-      setUserLines((prev) => [...prev, currentLine]);
+      setUserSegments((prev) => [...prev, [startIndex, endIndex]]);
     }
-    setCurrentLine(null);
-    lastNodeRef.current = null;
-  }, [currentLine]);
+    setActiveSegment(null);
+  }, [activeSegment]);
 
   return (
     <svg
@@ -127,7 +138,7 @@ export const PatternCanvas = forwardRef<PatternCanvasRef, PatternCanvasProps>(
       onTouchStart={handleStart}
       onTouchMove={handleMove}
       onTouchEnd={handleEnd}
-      style={{ touchAction: 'none', userSelect: 'none' }}
+      style={{ touchAction: 'none', userSelect: 'none', maxWidth: '100%', height: 'auto', display: 'block' }}
     >
       {/* Pattern edges */}
       <g stroke="var(--color-stroke)" strokeWidth={STROKE} fill="none">
@@ -137,8 +148,9 @@ export const PatternCanvas = forwardRef<PatternCanvasRef, PatternCanvasProps>(
           const dx = x2 - x1;
           const dy = y2 - y1;
           const len = Math.hypot(dx, dy);
-          const ax = (dx / len) * (len - 12);
-          const ay = (dy / len) * (len - 12);
+          const bodyLen = Math.max(len - 12, 0);
+          const ax = (dx / len) * bodyLen;
+          const ay = (dy / len) * bodyLen;
           return (
             <g key={i}>
               <line x1={x1} y1={y1} x2={x1 + ax} y2={y1 + ay} />
@@ -153,12 +165,21 @@ export const PatternCanvas = forwardRef<PatternCanvasRef, PatternCanvasProps>(
 
       {/* User drawn lines */}
       <g stroke="var(--color-accent)" strokeWidth={2.5} fill="none" strokeLinecap="round">
-        {userLines.map((line, i) => (
-          <polyline key={i} points={line.map(([x, y]) => `${x},${y}`).join(' ')} />
-        ))}
-        {currentLine && currentLine.length > 1 && (
-          <polyline points={currentLine.map(([x, y]) => `${x},${y}`).join(' ')} />
-        )}
+        {userSegments.map(([from, to], i) => {
+          const [x1, y1] = toSvg(pattern.nodes[from][0], pattern.nodes[from][1]);
+          const [x2, y2] = toSvg(pattern.nodes[to][0], pattern.nodes[to][1]);
+          return <line key={i} x1={x1} y1={y1} x2={x2} y2={y2} />;
+        })}
+        {activeSegment && (() => {
+          const [x1, y1] = toSvg(
+            pattern.nodes[activeSegment.startIndex][0],
+            pattern.nodes[activeSegment.startIndex][1]
+          );
+          const [x2, y2] = activeSegment.endIndex !== null
+            ? toSvg(pattern.nodes[activeSegment.endIndex][0], pattern.nodes[activeSegment.endIndex][1])
+            : activeSegment.pointer;
+          return <line x1={x1} y1={y1} x2={x2} y2={y2} opacity={0.9} />;
+        })()}
       </g>
 
       {/* Nodes */}
