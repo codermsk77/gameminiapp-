@@ -242,9 +242,29 @@
 }
 
 .completion-screen .completed-stats {
-  font-size: 1.1rem;
-  color: var(--color-text-muted);
+  display: grid;
+  gap: 12px;
   margin-bottom: 32px;
+  width: 100%;
+  max-width: 260px;
+}
+
+.completion-screen .completed-stat {
+  margin: 0;
+  padding: 14px 18px;
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.78);
+  border: 1px solid var(--color-progress-bg);
+  color: var(--color-text-muted);
+  font-size: 0.95rem;
+}
+
+.completion-screen .completed-stat strong {
+  display: block;
+  margin-top: 6px;
+  color: var(--color-text);
+  font-size: 1.2rem;
+  font-weight: 600;
 }
 
 .restart-btn {

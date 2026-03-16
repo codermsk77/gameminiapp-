@@ -6,12 +6,14 @@ import { createPatternProjector } from '../utils/patternLayout';
 const NODE_R = 6;
 const HIT_R = 20;
 const STROKE = 1.5;
+const ARROW_GAP = 12;
+const ARROW_HEAD_LENGTH = 10;
+const ARROW_HEAD_WIDTH = 4;
 const snapCoord = (value: number) => Math.round(value) + 0.5;
 
 type UserSegment = [number, number];
-type ActiveSegment = {
-  startIndex: number;
-  endIndex: number | null;
+type ActiveStroke = {
+  currentIndex: number;
   pointer: [number, number];
 };
 
@@ -57,8 +59,9 @@ interface PatternCanvasProps {
 export const PatternCanvas = forwardRef<PatternCanvasRef, PatternCanvasProps>(
   function PatternCanvas({ pattern, size = 280, className = '' }, ref) {
   const svgRef = useRef<SVGSVGElement>(null);
+  const activeNodeRef = useRef<number | null>(null);
   const [userSegments, setUserSegments] = useState<UserSegment[]>([]);
-  const [activeSegment, setActiveSegment] = useState<ActiveSegment | null>(null);
+  const [activeStroke, setActiveStroke] = useState<ActiveStroke | null>(null);
 
   useImperativeHandle(ref, () => ({
     undo: () => {
@@ -85,9 +88,9 @@ export const PatternCanvas = forwardRef<PatternCanvasRef, PatternCanvasProps>(
       const nodeIdx = findNearestNode(x, y, pattern.nodes, toSvg);
       if (nodeIdx !== null) {
         hapticSelection();
-        setActiveSegment({
-          startIndex: nodeIdx,
-          endIndex: null,
+        activeNodeRef.current = nodeIdx;
+        setActiveStroke({
+          currentIndex: nodeIdx,
           pointer: [x, y],
         });
       }
@@ -97,32 +100,39 @@ export const PatternCanvas = forwardRef<PatternCanvasRef, PatternCanvasProps>(
 
   const handleMove = useCallback(
     (e: React.MouseEvent | React.TouchEvent) => {
-      if (!activeSegment) return;
+      if (activeNodeRef.current === null) return;
       const rect = svgRef.current?.getBoundingClientRect();
       if (!rect) return;
       const [x, y] = getSvgCoords(e, rect);
       const nodeIdx = findNearestNode(x, y, pattern.nodes, toSvg);
-      setActiveSegment((prev) => (
+      if (nodeIdx !== null && nodeIdx !== activeNodeRef.current) {
+        const from = activeNodeRef.current;
+        activeNodeRef.current = nodeIdx;
+        hapticSelection();
+        setUserSegments((prev) => [...prev, [from, nodeIdx]]);
+        setActiveStroke({
+          currentIndex: nodeIdx,
+          pointer: [x, y],
+        });
+        return;
+      }
+
+      setActiveStroke((prev) => (
         prev
           ? {
               ...prev,
               pointer: [x, y],
-              endIndex: nodeIdx !== null && nodeIdx !== prev.startIndex ? nodeIdx : null,
             }
           : null
       ));
     },
-    [activeSegment, pattern.nodes, toSvg]
+    [pattern.nodes, toSvg]
   );
 
   const handleEnd = useCallback(() => {
-    if (activeSegment && activeSegment.endIndex !== null) {
-      const { startIndex, endIndex } = activeSegment;
-      hapticLight();
-      setUserSegments((prev) => [...prev, [startIndex, endIndex]]);
-    }
-    setActiveSegment(null);
-  }, [activeSegment]);
+    activeNodeRef.current = null;
+    setActiveStroke(null);
+  }, []);
 
   return (
     <svg
@@ -148,14 +158,20 @@ export const PatternCanvas = forwardRef<PatternCanvasRef, PatternCanvasProps>(
           const dx = x2 - x1;
           const dy = y2 - y1;
           const len = Math.hypot(dx, dy);
-          const bodyLen = Math.max(len - 12, 0);
-          const ax = (dx / len) * bodyLen;
-          const ay = (dy / len) * bodyLen;
+          if (len === 0) return null;
+          const ux = dx / len;
+          const uy = dy / len;
+          const nx = -uy;
+          const ny = ux;
+          const tipX = x2 - ux * ARROW_GAP;
+          const tipY = y2 - uy * ARROW_GAP;
+          const baseX = tipX - ux * ARROW_HEAD_LENGTH;
+          const baseY = tipY - uy * ARROW_HEAD_LENGTH;
           return (
             <g key={i}>
-              <line x1={x1} y1={y1} x2={x1 + ax} y2={y1 + ay} />
+              <line x1={x1} y1={y1} x2={baseX} y2={baseY} />
               <polygon
-                points={`${x2},${y2} ${x2 - (dx / len) * 10 + (-dy / len) * 4},${y2 - (dy / len) * 10 + (dx / len) * 4} ${x2 - (dx / len) * 10 - (-dy / len) * 4},${y2 - (dy / len) * 10 - (dx / len) * 4}`}
+                points={`${tipX},${tipY} ${baseX + nx * ARROW_HEAD_WIDTH},${baseY + ny * ARROW_HEAD_WIDTH} ${baseX - nx * ARROW_HEAD_WIDTH},${baseY - ny * ARROW_HEAD_WIDTH}`}
                 fill="var(--color-stroke)"
               />
             </g>
@@ -170,14 +186,12 @@ export const PatternCanvas = forwardRef<PatternCanvasRef, PatternCanvasProps>(
           const [x2, y2] = toSvg(pattern.nodes[to][0], pattern.nodes[to][1]);
           return <line key={i} x1={x1} y1={y1} x2={x2} y2={y2} />;
         })}
-        {activeSegment && (() => {
+        {activeStroke && (() => {
           const [x1, y1] = toSvg(
-            pattern.nodes[activeSegment.startIndex][0],
-            pattern.nodes[activeSegment.startIndex][1]
+            pattern.nodes[activeStroke.currentIndex][0],
+            pattern.nodes[activeStroke.currentIndex][1]
           );
-          const [x2, y2] = activeSegment.endIndex !== null
-            ? toSvg(pattern.nodes[activeSegment.endIndex][0], pattern.nodes[activeSegment.endIndex][1])
-            : activeSegment.pointer;
+          const [x2, y2] = activeStroke.pointer;
           return <line x1={x1} y1={y1} x2={x2} y2={y2} opacity={0.9} />;
         })()}
       </g>

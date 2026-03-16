@@ -25,6 +25,19 @@ function shuffle<T>(arr: T[]): T[] {
   return out;
 }
 
+function formatDuration(ms: number): string {
+  const totalSeconds = Math.max(0, Math.round(ms / 1000));
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+
+  if (hours > 0) {
+    return `${hours}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+  }
+
+  return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+}
+
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>('start');
@@ -32,6 +45,8 @@ export default function App() {
   const [patternOrder, setPatternOrder] = useState<number[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [completedCount, setCompletedCount] = useState(0);
+  const [sessionStartedAt, setSessionStartedAt] = useState<number | null>(null);
+  const [sessionDurationMs, setSessionDurationMs] = useState(0);
   const [helpOpen, setHelpOpen] = useState(false);
   const canvasRef = useRef<PatternCanvasRef>(null);
 
@@ -53,15 +68,19 @@ export default function App() {
     setPatternOrder(order);
     setCurrentIndex(0);
     setCompletedCount(0);
+    setSessionStartedAt(Date.now());
+    setSessionDurationMs(0);
     setScreen('game');
   };
 
   const goNext = () => {
     hapticLight();
-    if (canvasRef.current?.hasDrawn()) {
+    const hasDrawn = canvasRef.current?.hasDrawn() ?? false;
+    if (hasDrawn) {
       setCompletedCount((c) => c + 1);
     }
     if (isLast) {
+      setSessionDurationMs(sessionStartedAt ? Date.now() - sessionStartedAt : 0);
       setScreen('complete');
     } else {
       setCurrentIndex((i) => i + 1);
@@ -77,6 +96,8 @@ export default function App() {
     setPatternOrder([]);
     setCurrentIndex(0);
     setCompletedCount(0);
+    setSessionStartedAt(null);
+    setSessionDurationMs(0);
   };
 
   useEffect(() => {
@@ -173,9 +194,16 @@ export default function App() {
               ? 'Все паттерны пройдены'
               : 'Сессия завершена'}
           </h2>
-          <p className="completed-stats">
-            Пройдено: {completedCount} из {PATTERN_COUNT} паттернов
-          </p>
+          <div className="completed-stats">
+            <p className="completed-stat">
+              Время
+              <strong>{formatDuration(sessionDurationMs)}</strong>
+            </p>
+            <p className="completed-stat">
+              Пройдено
+              <strong>{completedCount} из {PATTERN_COUNT}</strong>
+            </p>
+          </div>
           <button type="button" className="restart-btn" onClick={restart}>
             <ArrowsClockwise size={20} weight="bold" />
             Заново

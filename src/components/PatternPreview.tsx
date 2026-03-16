@@ -3,6 +3,9 @@ import { createPatternProjector } from '../utils/patternLayout';
 
 const NODE_R = 4;
 const STROKE = 1.2;
+const ARROW_GAP = 9;
+const ARROW_HEAD_LENGTH = 7;
+const ARROW_HEAD_WIDTH = 3;
 const snapCoord = (value: number) => Math.round(value) + 0.5;
 
 interface PatternPreviewProps {
@@ -30,14 +33,20 @@ export function PatternPreview({ pattern, size = 180, className = '' }: PatternP
           const dx = x2 - x1;
           const dy = y2 - y1;
           const len = Math.hypot(dx, dy);
-          const bodyLen = Math.max(len - 8, 0);
-          const ax = (dx / len) * bodyLen;
-          const ay = (dy / len) * bodyLen;
+          if (len === 0) return null;
+          const ux = dx / len;
+          const uy = dy / len;
+          const nx = -uy;
+          const ny = ux;
+          const tipX = x2 - ux * ARROW_GAP;
+          const tipY = y2 - uy * ARROW_GAP;
+          const baseX = tipX - ux * ARROW_HEAD_LENGTH;
+          const baseY = tipY - uy * ARROW_HEAD_LENGTH;
           return (
             <g key={i}>
-              <line x1={x1} y1={y1} x2={x1 + ax} y2={y1 + ay} />
+              <line x1={x1} y1={y1} x2={baseX} y2={baseY} />
               <polygon
-                points={`${x2},${y2} ${x2 - (dx / len) * 7 + (-dy / len) * 3},${y2 - (dy / len) * 7 + (dx / len) * 3} ${x2 - (dx / len) * 7 - (-dy / len) * 3},${y2 - (dy / len) * 7 - (dx / len) * 3}`}
+                points={`${tipX},${tipY} ${baseX + nx * ARROW_HEAD_WIDTH},${baseY + ny * ARROW_HEAD_WIDTH} ${baseX - nx * ARROW_HEAD_WIDTH},${baseY - ny * ARROW_HEAD_WIDTH}`}
                 fill="var(--color-stroke)"
               />
             </g>
