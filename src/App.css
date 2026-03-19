@@ -77,6 +77,8 @@
 
 .mode-selector {
   display: flex;
+  width: 100%;
+  max-width: 360px;
   gap: 12px;
   margin-bottom: 8px;
 }
@@ -88,6 +90,7 @@
   background: var(--color-surface);
   border: 2px solid var(--color-stroke);
   font-size: 0.95rem;
+  white-space: nowrap;
   display: flex;
   align-items: center;
   justify-content: center;
