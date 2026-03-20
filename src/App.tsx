@@ -8,6 +8,7 @@ import './App.css';
 
 type Screen = 'start' | 'game' | 'complete';
 type OrderMode = 'sequential' | 'random';
+const DEFAULT_ORDER_MODE: OrderMode = 'random';
 
 const HELP_TEXT = `Натренированный отдых – теория восстановления концентрации;
 Паттерны – один из способов её реализации.
@@ -38,15 +39,26 @@ function formatDuration(ms: number): string {
   return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
 }
 
+function formatCompletedAt(timestamp: number): string {
+  return new Intl.DateTimeFormat('ru-RU', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(timestamp);
+}
+
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>('start');
-  const [orderMode, setOrderMode] = useState<OrderMode>('random');
+  const [orderMode, setOrderMode] = useState<OrderMode>(DEFAULT_ORDER_MODE);
   const [patternOrder, setPatternOrder] = useState<number[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [completedCount, setCompletedCount] = useState(0);
   const [sessionStartedAt, setSessionStartedAt] = useState<number | null>(null);
   const [sessionDurationMs, setSessionDurationMs] = useState(0);
+  const [sessionCompletedAt, setSessionCompletedAt] = useState<number | null>(null);
   const [helpOpen, setHelpOpen] = useState(false);
   const canvasRef = useRef<PatternCanvasRef>(null);
 
@@ -70,6 +82,7 @@ export default function App() {
     setCompletedCount(0);
     setSessionStartedAt(Date.now());
     setSessionDurationMs(0);
+    setSessionCompletedAt(null);
     setScreen('game');
   };
 
@@ -80,7 +93,9 @@ export default function App() {
       setCompletedCount((c) => c + 1);
     }
     if (isLast) {
-      setSessionDurationMs(sessionStartedAt ? Date.now() - sessionStartedAt : 0);
+      const completedAt = Date.now();
+      setSessionDurationMs(sessionStartedAt ? completedAt - sessionStartedAt : 0);
+      setSessionCompletedAt(completedAt);
       setScreen('complete');
     } else {
       setCurrentIndex((i) => i + 1);
@@ -93,11 +108,13 @@ export default function App() {
 
   const restart = () => {
     setScreen('start');
+    setOrderMode(DEFAULT_ORDER_MODE);
     setPatternOrder([]);
     setCurrentIndex(0);
     setCompletedCount(0);
     setSessionStartedAt(null);
     setSessionDurationMs(0);
+    setSessionCompletedAt(null);
   };
 
   useEffect(() => {
@@ -203,6 +220,12 @@ export default function App() {
               Пройдено
               <strong>{completedCount} из {PATTERN_COUNT}</strong>
             </p>
+            {sessionCompletedAt && (
+              <p className="completed-stat">
+                Дата и время
+                <strong>{formatCompletedAt(sessionCompletedAt)}</strong>
+              </p>
+            )}
           </div>
           <button type="button" className="restart-btn" onClick={restart}>
             <ArrowsClockwise size={20} weight="bold" />
