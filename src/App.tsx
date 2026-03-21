@@ -8,7 +8,7 @@ import './App.css';
 
 type Screen = 'start' | 'game' | 'complete';
 type OrderMode = 'sequential' | 'random';
-const DEFAULT_ORDER_MODE: OrderMode = 'random';
+const DEFAULT_ORDER_MODE: OrderMode = 'sequential';
 
 const HELP_TEXT = `Натренированный отдых – теория восстановления концентрации;
 Паттерны – один из способов её реализации.
